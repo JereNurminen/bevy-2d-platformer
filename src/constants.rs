@@ -8,7 +8,7 @@ pub const fn times_phys_length_unit(value: i64) -> f32 {
     value as f32 * PHYSICS_LENGTH_UNIT
 }
 
-const fn pixels_to_world_units(value: i64) -> f32 {
+pub const fn pixels_to_world_units(value: i64) -> f32 {
     value as f32 / PHYSICS_LENGTH_UNIT
 }
 

@@ -21,6 +21,12 @@ fn setup_level(mut commands: Commands) {
         Vec2::new(times_phys_length_unit(20), times_phys_length_unit(2)),
         Color::linear_rgb(0.5, 0.5, 0.5),
     ));
+
+    commands.spawn(PlatformBundle::new(
+        Vec2::new(times_phys_length_unit(10), times_phys_length_unit(3)),
+        Vec2::new(times_phys_length_unit(6), times_phys_length_unit(2)),
+        Color::linear_rgb(0.5, 0.5, 0.5),
+    ));
 }
 
 fn cleanup_game(mut commands: Commands, game_query: Query<Entity, With<GameEntity>>) {

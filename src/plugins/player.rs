@@ -1,128 +1,81 @@
-use bevy::prelude::*;
+use bevy::{color::palettes::css, prelude::*, text::cosmic_text::ttf_parser::kern};
 
-use crate::bundles::PlayerBundle;
-use crate::components::{IsGrounded, JumpState, KinematicVelocity, Player, PlayerController};
-use crate::states::GameState;
+use avian2d::prelude::*;
 
-pub struct PlayerPlugin;
+use bevy_tnua::{
+    math::{Float, Vector3},
+    prelude::*,
+};
+use bevy_tnua_avian2d::*;
 
-impl Plugin for PlayerPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::Game), spawn_player)
-            .add_systems(
-                Update,
-                (
-                    update_jump_timers,
-                    kinematic_player_movement,
-                    apply_kinematic_movement,
-                )
-                    .chain()
-                    .run_if(in_state(GameState::Game)),
-            );
+use crate::{
+    components::Player,
+    constants::{PLAYER_HEIGHT, PLAYER_WIDTH, pixels_to_world_units, times_phys_length_unit},
+};
+
+pub fn setup_player(mut commands: Commands) {
+    commands.spawn((
+        Player,
+        Transform::from_xyz(times_phys_length_unit(2), times_phys_length_unit(10), 0.0),
+        // The player character needs to be configured as a dynamic rigid body of the physics
+        // engine.
+        RigidBody::Dynamic,
+        Collider::capsule(PLAYER_WIDTH / 2.0, PLAYER_HEIGHT / 2.0),
+        // This is Tnua's interface component.
+        TnuaController::default(),
+        // A sensor shape is not strictly necessary, but without it we'll get weird results.
+        TnuaAvian2dSensorShape(Collider::rectangle(PLAYER_WIDTH, 0.0)),
+        // Tnua can fix the rotation, but the character will still get rotated before it can do so.
+        // By locking the rotation we can prevent this.
+        LockedAxes::ROTATION_LOCKED,
+        Sprite {
+            color: Color::srgb(0.3, 0.7, 0.3),
+            custom_size: Some(Vec2::new(PLAYER_WIDTH, PLAYER_HEIGHT)),
+            ..default()
+        },
+    ));
+}
+
+pub fn apply_controls(keyboard: Res<ButtonInput<KeyCode>>, mut query: Query<&mut TnuaController>) {
+    let Ok(mut controller) = query.single_mut() else {
+        return;
+    };
+
+    let mut direction = Vector3::ZERO;
+
+    if keyboard.any_pressed([KeyCode::ArrowLeft, KeyCode::KeyA]) {
+        direction -= Vector3::X;
     }
-}
-
-fn spawn_player(mut commands: Commands) {
-    commands.spawn(PlayerBundle::default());
-}
-
-fn update_jump_timers(
-    time: Res<Time>,
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut query: Query<(&mut JumpState, &IsGrounded, &PlayerController), With<Player>>,
-) {
-    for (mut jump_state, is_grounded, controller) in &mut query {
-        let dt = time.delta_secs();
-
-        // Update jump buffer timer
-        if keyboard.just_pressed(KeyCode::Space)
-            || keyboard.just_pressed(KeyCode::KeyW)
-            || keyboard.just_pressed(KeyCode::ArrowUp)
-        {
-            jump_state.jump_buffer_timer = controller.jump_buffer_time;
-        } else {
-            jump_state.jump_buffer_timer = (jump_state.jump_buffer_timer - dt).max(0.0);
-        }
-
-        // Update coyote timer
-        if is_grounded.0 {
-            jump_state.coyote_timer = controller.coyote_time;
-        } else if jump_state.was_grounded_last_frame {
-            // Just left the ground, start coyote time
-        } else {
-            jump_state.coyote_timer = (jump_state.coyote_timer - dt).max(0.0);
-        }
-
-        jump_state.was_grounded_last_frame = is_grounded.0;
+    if keyboard.any_pressed([KeyCode::ArrowRight, KeyCode::KeyD]) {
+        direction += Vector3::X;
     }
-}
 
-pub fn kinematic_player_movement(
-    time: Res<Time>,
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut query: Query<
-        (
-            &mut KinematicVelocity,
-            &mut JumpState,
-            &PlayerController,
-            &IsGrounded,
-        ),
-        With<Player>,
-    >,
-) {
-    for (mut velocity, mut jump_state, controller, is_grounded) in &mut query {
-        let dt = time.delta_secs();
+    // Feed the basis every frame. Even if the player doesn't move - just use `desired_velocity:
+    // Vec3::ZERO`. `TnuaController` starts without a basis, which will make the character collider
+    // just fall.
+    controller.basis(TnuaBuiltinWalk {
+        desired_velocity: direction.normalize_or_zero() * times_phys_length_unit(10),
+        acceleration: times_phys_length_unit(20),
+        air_acceleration: times_phys_length_unit(20),
+        float_height: PLAYER_HEIGHT / 2.0 + pixels_to_world_units(1),
+        coyote_time: 0.3,
+        ..Default::default()
+    });
 
-        // Horizontal movement
-        let mut move_x = 0.0;
-        if keyboard.pressed(KeyCode::KeyA) || keyboard.pressed(KeyCode::ArrowLeft) {
-            move_x -= 1.0;
-        }
-        if keyboard.pressed(KeyCode::KeyD) || keyboard.pressed(KeyCode::ArrowRight) {
-            move_x += 1.0;
-        }
-        velocity.velocity.x = move_x * controller.move_speed;
-
-        // Jump logic with buffer and coyote time
-        let can_jump = is_grounded.0 || jump_state.coyote_timer > 0.0;
-        let wants_to_jump = jump_state.jump_buffer_timer > 0.0;
-
-        let just_jumped = can_jump && wants_to_jump;
-        if just_jumped {
-            velocity.velocity.y = controller.jump_force;
-            jump_state.jump_buffer_timer = 0.0;
-            jump_state.coyote_timer = 0.0;
-            println!("JUMP! velocity.y: {}", velocity.velocity.y);
-        }
-
-        // Variable jump height - if player releases jump key early, reduce upward velocity
-        let jump_key_pressed = keyboard.pressed(KeyCode::Space)
-            || keyboard.pressed(KeyCode::KeyW)
-            || keyboard.pressed(KeyCode::ArrowUp);
-
-        if !jump_key_pressed && velocity.velocity.y > 0.0 {
-            velocity.velocity.y *= 0.5;
-        }
-
-        // Apply gravity (but not on the frame we just jumped)
-        if !is_grounded.0 && !just_jumped {
-            velocity.velocity.y -= controller.gravity * dt;
-            // Cap fall speed
-            velocity.velocity.y = velocity.velocity.y.max(-controller.max_fall_speed);
-        }
-    }
-}
-
-pub fn apply_kinematic_movement(
-    time: Res<Time>,
-    mut query: Query<(&mut Transform, &KinematicVelocity), With<Player>>,
-) {
-    for (mut transform, velocity) in &mut query {
-        let dt = time.delta_secs();
-        let movement = velocity.velocity * dt;
-
-        // Apply movement with small epsilon to prevent floating point precision issues
-        transform.translation.x += movement.x;
-        transform.translation.y += movement.y;
+    // Feed the jump action every frame as long as the player holds the jump button. If the player
+    // stops holding the jump button, simply stop feeding the action.
+    if keyboard.pressed(KeyCode::Space) {
+        println!("jump");
+        controller.action(TnuaBuiltinJump {
+            // The height is the only mandatory field of the jump button.
+            height: times_phys_length_unit(4),
+            // `TnuaBuiltinJump` also has customization fields with sensible defaults.
+            takeoff_extra_gravity: times_phys_length_unit(60),
+            takeoff_above_velocity: 2.0,
+            fall_extra_gravity: times_phys_length_unit(20),
+            shorten_extra_gravity: times_phys_length_unit(5),
+            input_buffer_time: 0.1,
+            ..Default::default()
+        });
     }
 }

@@ -1,0 +1,29 @@
+{
+	"identifier": "Level_0",
+	"uniqueIdentifer": "8f328ed0-8560-11f0-beb1-49fde5ff7abd",
+	"x": 0,
+	"y": 0,
+	"width": 512,
+	"height": 512,
+	"bgColor": "#696A79",
+	"neighbourLevels": [],
+	"customFields" : {},
+	"layers": [
+		"Level_Geometry_Tiles.png"
+	],
+	"entities": {
+		"Player_start": [
+			{
+				"id": "Player_start",
+				"iid": "49e27ff0-8560-11f0-beb1-3d62ec8a67d4",
+				"layer": "Entities",
+				"x": 144,
+				"y": 32,
+				"width": 32,
+				"height": 64,
+				"color": 39387,
+				"customFields" : {}
+			}
+		]
+	}
+}

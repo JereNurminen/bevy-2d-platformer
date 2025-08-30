@@ -1,8 +1,4 @@
-// Physics and game constants
-// With Avian2D length unit set to 32.0, all measurements are in world units where 1 unit = 32 pixels
-
-// Physics world scale
-pub const PHYSICS_LENGTH_UNIT: f32 = 32.0;
+pub const PHYSICS_LENGTH_UNIT: f32 = 16.0;
 
 pub const fn times_phys_length_unit(value: i64) -> f32 {
     value as f32 * PHYSICS_LENGTH_UNIT

@@ -1,6 +1,7 @@
 use bevy::prelude::*;
+use bevy_ecs_ldtk::LdtkWorldBundle;
 
-use crate::bundles::PlatformBundle;
+use crate::bundles::platform::PlatformBundle;
 use crate::components::GameEntity;
 use crate::constants::*;
 use crate::states::GameState;
@@ -9,12 +10,12 @@ pub struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::Game), setup_level)
+        app.add_systems(OnEnter(GameState::Game), setup)
             .add_systems(OnExit(GameState::Game), cleanup_game);
     }
 }
 
-fn setup_level(mut commands: Commands) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     // Ground platform
     commands.spawn(PlatformBundle::new(
         Vec2::new(0.0, 0.0),

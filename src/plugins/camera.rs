@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
-use crate::bundles::CameraBundle;
-use crate::components::{MainCamera, Player};
+use crate::bundles::camera::{self, CameraBundle, MainCamera};
+use crate::bundles::player::Player;
 use crate::states::GameState;
 
 pub struct CameraPlugin;

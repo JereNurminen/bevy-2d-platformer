@@ -8,3 +8,5 @@ bevy = "0.16.1"
 avian2d = "0.3.1"
 bevy-tnua-avian2d = "0.5.0"
 bevy-tnua = "0.24.0"
+leafwing-input-manager = "0.17.1"
+bevy_ecs_ldtk = { version = "0.12.0", features = ["external_levels"] }

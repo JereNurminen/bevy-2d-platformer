@@ -10,7 +10,7 @@ use bevy_tnua_avian2d::*;
 
 use crate::{
     bundles::player::Player,
-    constants::{PLAYER_HEIGHT, PLAYER_WIDTH, pixels_to_world_units, times_phys_length_unit},
+    constants::{PLAYER_HEIGHT, PLAYER_WIDTH, multiply_by_tile_size, pixels_to_world_units},
 };
 
 pub fn apply_controls(keyboard: Res<ButtonInput<KeyCode>>, mut query: Query<&mut TnuaController>) {
@@ -28,9 +28,9 @@ pub fn apply_controls(keyboard: Res<ButtonInput<KeyCode>>, mut query: Query<&mut
     }
 
     controller.basis(TnuaBuiltinWalk {
-        desired_velocity: direction.normalize_or_zero() * times_phys_length_unit(10),
-        acceleration: times_phys_length_unit(40),
-        air_acceleration: times_phys_length_unit(30),
+        desired_velocity: direction.normalize_or_zero() * multiply_by_tile_size(10),
+        acceleration: multiply_by_tile_size(40),
+        air_acceleration: multiply_by_tile_size(30),
         float_height: PLAYER_HEIGHT / 2.0 + pixels_to_world_units(1),
         coyote_time: 0.3,
         ..Default::default()
@@ -39,11 +39,11 @@ pub fn apply_controls(keyboard: Res<ButtonInput<KeyCode>>, mut query: Query<&mut
     if keyboard.pressed(KeyCode::Space) {
         println!("jump");
         controller.action(TnuaBuiltinJump {
-            height: times_phys_length_unit(4),
-            takeoff_extra_gravity: times_phys_length_unit(60),
+            height: multiply_by_tile_size(4),
+            takeoff_extra_gravity: multiply_by_tile_size(60),
             takeoff_above_velocity: 2.0,
-            fall_extra_gravity: times_phys_length_unit(20),
-            shorten_extra_gravity: times_phys_length_unit(5),
+            fall_extra_gravity: multiply_by_tile_size(20),
+            shorten_extra_gravity: multiply_by_tile_size(5),
             input_buffer_time: 0.1,
             ..Default::default()
         });

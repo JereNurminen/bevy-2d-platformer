@@ -18,7 +18,7 @@ mod tile_merger;
 use bevy_tnua::{TnuaUserControlsSystemSet, prelude::TnuaControllerPlugin};
 use bevy_tnua_avian2d::TnuaAvian2dPlugin;
 //use bundles::spawn_point::{PlayerSpawnBundle, PlayerSpawnPlugin, RespawnPlayer};
-pub use constants::times_phys_length_unit;
+pub use constants::multiply_by_tile_size;
 use level::LevelPlugin;
 use level_enums::*;
 use player::apply_controls;
@@ -45,7 +45,7 @@ fn main() {
             FixedUpdate,
             apply_controls.in_set(TnuaUserControlsSystemSet),
         )
-        .insert_resource(Gravity(Vec2::NEG_Y * times_phys_length_unit(10)))
+        .insert_resource(Gravity(Vec2::NEG_Y * multiply_by_tile_size(10)))
         //.add_systems(Startup, setup_player)
         .init_state::<GameState>()
         .run();

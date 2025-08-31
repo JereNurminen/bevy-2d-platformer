@@ -32,11 +32,7 @@ impl Default for PlayerBundle {
                 custom_size: Some(Vec2::new(PLAYER_WIDTH, PLAYER_HEIGHT)),
                 ..default()
             },
-            transform: Transform::from_xyz(
-                times_phys_length_unit(0),
-                times_phys_length_unit(0),
-                0.0,
-            ),
+            transform: Transform::from_xyz(multiply_by_tile_size(0), multiply_by_tile_size(0), 0.0),
             rigid_body: RigidBody::Dynamic,
             collider: Collider::capsule(PLAYER_WIDTH / 2.0, PLAYER_HEIGHT / 2.0),
             locked_axes: LockedAxes::ROTATION_LOCKED,

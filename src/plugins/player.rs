@@ -15,7 +15,6 @@ use crate::{
 
 pub fn apply_controls(keyboard: Res<ButtonInput<KeyCode>>, mut query: Query<&mut TnuaController>) {
     let Ok(mut controller) = query.single_mut() else {
-        println!("Found {:?} player entities", query.iter().count());
         return;
     };
 

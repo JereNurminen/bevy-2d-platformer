@@ -2,6 +2,7 @@
 name = "bevy2dmetroidvania"
 version = "0.1.0"
 edition = "2024"
+build = "build.rs"
 
 [dependencies]
 bevy = "0.16.1"
@@ -9,4 +10,9 @@ avian2d = "0.3.1"
 bevy-tnua-avian2d = "0.5.0"
 bevy-tnua = "0.24.0"
 leafwing-input-manager = "0.17.1"
-bevy_ecs_ldtk = { version = "0.12.0", features = ["external_levels"] }
+ldtk_rust = { path = "../ldtk_rust" }
+bevy-inspector-egui = "0.33.1"
+
+[build-dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

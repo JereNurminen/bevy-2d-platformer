@@ -1,7 +1,5 @@
 use avian2d::prelude::*;
 use bevy::prelude::*;
-use bevy_ecs_ldtk::LdtkEntity;
-use bevy_ecs_ldtk::Worldly;
 use bevy_tnua::prelude::TnuaController;
 use bevy_tnua_avian2d::TnuaAvian2dSensorShape;
 
@@ -11,7 +9,7 @@ use crate::constants::*;
 #[derive(Component)]
 pub struct Player;
 
-#[derive(Bundle, LdtkEntity)]
+#[derive(Bundle)]
 pub struct PlayerBundle {
     pub player: Player,
     pub sprite: Sprite,
@@ -21,9 +19,7 @@ pub struct PlayerBundle {
     pub locked_axes: LockedAxes,
     pub game_entity: GameEntity,
     pub tnua_controller: TnuaController,
-    sensor_shape: TnuaAvian2dSensorShape,
-    #[worldly]
-    worldly: Worldly,
+    pub sensor_shape: TnuaAvian2dSensorShape,
 }
 
 impl Default for PlayerBundle {
@@ -47,7 +43,6 @@ impl Default for PlayerBundle {
             tnua_controller: TnuaController::default(),
             game_entity: GameEntity,
             sensor_shape: TnuaAvian2dSensorShape(Collider::rectangle(PLAYER_WIDTH, 0.0)),
-            worldly: Worldly::default(),
         }
     }
 }

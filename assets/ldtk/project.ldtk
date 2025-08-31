@@ -12,9 +12,9 @@
 	"jsonVersion": "1.5.3",
 	"appBuildId": 473703,
 	"nextUid": 42,
-	"identifierStyle": "Capitalize",
+	"identifierStyle": "Lowercase",
 	"toc": [{
-		"identifier": "Player_start",
+		"identifier": "player_start",
 		"instances": [{
 			"worldIid": "8f3267c0-8560-11f0-beb1-9f738255ba43",
 			"levelIid": "8f328ed0-8560-11f0-beb1-49fde5ff7abd",
@@ -57,7 +57,7 @@
 	"defs": { "layers": [
 		{
 			"__type": "Entities",
-			"identifier": "Entities",
+			"identifier": "entities",
 			"type": "Entities",
 			"uid": 41,
 			"doc": null,
@@ -92,7 +92,7 @@
 		},
 		{
 			"__type": "IntGrid",
-			"identifier": "Level_Geometry",
+			"identifier": "level_geometry",
 			"type": "IntGrid",
 			"uid": 2,
 			"doc": null,
@@ -127,7 +127,7 @@
 		},
 		{
 			"__type": "AutoLayer",
-			"identifier": "Level_Geometry_Tiles",
+			"identifier": "level_geometry_tiles",
 			"type": "AutoLayer",
 			"uid": 1,
 			"doc": null,
@@ -1244,7 +1244,7 @@
 		}
 	], "entities": [
 		{
-			"identifier": "Player_start",
+			"identifier": "player_start",
 			"uid": 40,
 			"tags": [],
 			"exportToToc": true,
@@ -1282,7 +1282,7 @@
 		{
 			"__cWid": 12,
 			"__cHei": 4,
-			"identifier": "Placeholder",
+			"identifier": "placeholder",
 			"uid": 4,
 			"relPath": "../sprites/tile-template.png",
 			"embedAtlas": null,
@@ -1304,7 +1304,7 @@
 	], "enums": [], "externalEnums": [], "levelFields": [] },
 	"levels": [
 		{
-			"identifier": "Level_0",
+			"identifier": "level_0",
 			"iid": "8f328ed0-8560-11f0-beb1-49fde5ff7abd",
 			"uid": 0,
 			"worldX": 0,
@@ -1325,7 +1325,7 @@
 			"fieldInstances": [],
 			"layerInstances": [
 				{
-					"__identifier": "Entities",
+					"__identifier": "entities",
 					"__type": "Entities",
 					"__cWid": 32,
 					"__cHei": 32,
@@ -1349,7 +1349,7 @@
 					"gridTiles": [],
 					"entityInstances": [
 						{
-							"__identifier": "Player_start",
+							"__identifier": "player_start",
 							"__grid": [9,2],
 							"__pivot": [0,0],
 							"__tags": [],
@@ -1367,7 +1367,7 @@
 					]
 				},
 				{
-					"__identifier": "Level_Geometry",
+					"__identifier": "level_geometry",
 					"__type": "IntGrid",
 					"__cWid": 32,
 					"__cHei": 32,
@@ -1423,7 +1423,7 @@
 					"entityInstances": []
 				},
 				{
-					"__identifier": "Level_Geometry_Tiles",
+					"__identifier": "level_geometry_tiles",
 					"__type": "AutoLayer",
 					"__cWid": 32,
 					"__cHei": 32,

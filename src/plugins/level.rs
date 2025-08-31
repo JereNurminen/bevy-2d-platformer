@@ -1,21 +1,16 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use avian2d::prelude::{Collider, RigidBody};
 use bevy::prelude::*;
 
 use crate::{
     bundles::{
-        level::{
-            LevelBundle, MergedTileColliderBundle, PhysicsTile, SingleTile, StaticLevelData,
-            TileCoords,
-        },
+        level::{LevelBundle, StaticLevelData, TileCoords},
         player::PlayerBundle,
     },
     constants::{self, TILE_SIZE},
-    level_enums::*,
     states::GameState,
-    tile_merger::{self, TileMerger},
-    times_phys_length_unit,
+    tile_merger::TileMerger,
 };
 
 pub struct LevelPlugin;
@@ -23,7 +18,7 @@ pub struct LevelPlugin;
 impl Plugin for LevelPlugin {
     fn build(&self, app: &mut App) {
         println!("Building level");
-        app.add_systems(OnEnter(GameState::Game), (setup_level));
+        app.add_systems(OnEnter(GameState::Game), setup_level);
     }
 }
 
@@ -41,32 +36,26 @@ pub fn setup_level(mut commands: Commands, asset_server: Res<AssetServer>) {
             match identifier.as_str() {
                 constants::layers::LEVEL_GEOMETRY => {
                     let width = layer.c_wid as usize;
-                    let tiles: Vec<MergedTileColliderBundle> = layer
-                        .int_grid_csv
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(index, &tile)| {
-                            if tile == 1 {
-                                let x = (index % width) as i64;
-                                let y = (index / width) as i64;
-                                Some(MergedTileColliderBundle {
-                                    rigid_body: RigidBody::Static,
-                                    collider: Collider::rectangle(TILE_SIZE, TILE_SIZE),
-                                    transform: Transform::from_xyz(
-                                        times_phys_length_unit(x) as f32,
-                                        times_phys_length_unit(y) * -1 as f32,
-                                        0.0,
-                                    ),
-                                })
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
 
-                    println!("Tiles for level: {:?}", tiles);
+                    // Collect all solid tile positions
+                    let mut tile_positions = HashSet::new();
+                    for (index, &tile) in layer.int_grid_csv.iter().enumerate() {
+                        if tile == 1 {
+                            let x = (index % width) as i64;
+                            let y = (index / width) as i64;
+                            tile_positions.insert(TileCoords { x, y });
+                        }
+                    }
 
-                    commands
+                    println!("Found {} individual tiles", tile_positions.len());
+
+                    // Use tile merger to create optimized colliders
+                    let tile_merger = TileMerger::new(TILE_SIZE);
+                    let collider_data = tile_merger.create_collider_data(&tile_positions);
+
+                    println!("Merged into {} physics colliders", collider_data.len());
+
+                    let level_entity = commands
                         .spawn((
                             LevelBundle {
                                 level_data: StaticLevelData {
@@ -78,57 +67,33 @@ pub fn setup_level(mut commands: Commands, asset_server: Res<AssetServer>) {
                                 (level_data.world_y * -1) as f32,
                                 0.0,
                             ),
+                            Sprite {
+                                image: asset_server.load(format!(
+                                    "ldtk/project/simplified/{}/_composite.png",
+                                    level_data.identifier
+                                )),
+                                anchor: bevy::sprite::Anchor::TopLeft,
+                                ..default()
+                            },
                         ))
-                        .with_children(|level_parent| {
-                            for tile in tiles {
-                                level_parent.spawn(tile);
-                            }
-                        });
-                    /*
-                    let tile_merger = tile_merger::TileMerger::new(TILE_SIZE);
-                    let merged_tiles =
-                        tile_merger
-                            .merge_tiles(&tiles)
-                            .into_iter()
-                            .map(|merged_tile| MergedTileColliderBundle {
-                                rigid_body: RigidBody::Static,
-                                collider: Collider::rectangle(
-                                    merged_tile.width as f32,
-                                    merged_tile.height as f32,
-                                ),
-                                transform: Transform::from_xyz(
-                                    times_phys_length_unit(merged_tile.x) as f32,
-                                    times_phys_length_unit(merged_tile.y) as f32,
+                        .id();
+
+                    // Spawn merged colliders as children of the level
+                    for (center_x, center_y, width, height) in collider_data {
+                        let collider_entity = commands
+                            .spawn((
+                                RigidBody::Static,
+                                Collider::rectangle(width, height),
+                                Transform::from_xyz(
+                                    center_x,
+                                    center_y * -1.0, // Flip Y coordinate for Bevy
                                     0.0,
                                 ),
-                            });
+                            ))
+                            .id();
 
-                    println!("Read level data: {:?}", level_data);
-                    println!(
-                        "Merged {:?} tiles into {:?} rectangles!",
-                        tiles.len(),
-                        merged_tiles.len()
-                    );
-
-                    commands
-                        .spawn((
-                            LevelBundle {
-                                level_data: StaticLevelData {
-                                    level_identifier: "test".to_string(),
-                                },
-                            },
-                            Transform::from_xyz(
-                                level_data.world_x as f32,
-                                level_data.world_y as f32,
-                                0.0,
-                            ),
-                        ))
-                        .with_children(|level_parent| {
-                            for tile in merged_tiles {
-                                level_parent.spawn(tile);
-                            }
-                        });
-                        */
+                        commands.entity(level_entity).add_child(collider_entity);
+                    }
                 }
                 constants::layers::ENTITIES => {
                     for entity in layer.entity_instances.iter() {

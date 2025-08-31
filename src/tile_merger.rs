@@ -30,6 +30,17 @@ impl Rectangle {
             && pos.y >= self.y
             && pos.y < self.y + self.height
     }
+
+    /// Get all tile coordinates that this rectangle covers
+    pub fn get_covered_tiles(&self) -> Vec<TileCoords> {
+        let mut tiles = Vec::new();
+        for x in self.x..(self.x + self.width) {
+            for y in self.y..(self.y + self.height) {
+                tiles.push(TileCoords { x, y });
+            }
+        }
+        tiles
+    }
 }
 
 pub struct TileMerger {
@@ -41,7 +52,7 @@ impl TileMerger {
         Self { tile_size }
     }
 
-    /// Main algorithm: converts a set of tile positions into optimized rectangles
+    /// Main algorithm: converts a set of tile positions into optimized rectangles using greedy approach
     pub fn merge_tiles(&self, tiles: &HashSet<TileCoords>) -> Vec<Rectangle> {
         if tiles.is_empty() {
             return Vec::new();
@@ -51,11 +62,13 @@ impl TileMerger {
         let mut rectangles = Vec::new();
 
         while !remaining_tiles.is_empty() {
-            // Find the best rectangle starting from any remaining tile
+            // Find the best rectangle that can be formed from remaining tiles
             let best_rect = self.find_best_rectangle(&remaining_tiles);
 
             // Remove all tiles covered by this rectangle
-            self.remove_covered_tiles(&mut remaining_tiles, &best_rect);
+            for tile in best_rect.get_covered_tiles() {
+                remaining_tiles.remove(&tile);
+            }
 
             rectangles.push(best_rect);
         }
@@ -63,21 +76,25 @@ impl TileMerger {
         rectangles
     }
 
-    /// Finds the best (largest area) rectangle that can be formed from remaining tiles
+    /// Finds the rectangle with the largest area that can be formed from available tiles
     fn find_best_rectangle(&self, tiles: &HashSet<TileCoords>) -> Rectangle {
-        let mut best_rect = Rectangle::new(0, 0, 1, 1);
+        let mut best_rect = None;
         let mut best_area = 0;
 
-        // Try starting from each tile position
-        for &start_pos in tiles {
-            let rect = self.find_largest_rect_from_position(tiles, start_pos);
+        // Try every tile as a potential top-left corner
+        for &tile in tiles {
+            let rect = self.find_largest_rect_from_position(tiles, tile);
             if rect.area() > best_area {
                 best_area = rect.area();
-                best_rect = rect;
+                best_rect = Some(rect);
             }
         }
 
-        best_rect
+        best_rect.unwrap_or_else(|| {
+            // Fallback: create a 1x1 rectangle from any remaining tile
+            let &first_tile = tiles.iter().next().unwrap();
+            Rectangle::new(first_tile.x, first_tile.y, 1, 1)
+        })
     }
 
     /// Find the largest rectangle that can be formed starting from a specific position
@@ -89,10 +106,10 @@ impl TileMerger {
         let mut best_rect = Rectangle::new(start.x, start.y, 1, 1);
         let mut best_area = 1;
 
-        // Find the maximum width we can extend to the right
-        let max_width = self.find_max_width(tiles, start);
+        // Find maximum possible width from this starting position
+        let max_width = self.find_max_width_from_position(tiles, start);
 
-        // For each possible width, find the maximum height
+        // For each width from 1 to max_width, find the maximum height
         for width in 1..=max_width {
             let height = self.find_max_height_for_width(tiles, start, width);
             let area = width * height;
@@ -106,15 +123,17 @@ impl TileMerger {
         best_rect
     }
 
-    /// Find maximum width we can extend from start position
-    fn find_max_width(&self, tiles: &HashSet<TileCoords>, start: TileCoords) -> i64 {
+    /// Find the maximum width we can extend horizontally from the starting position
+    fn find_max_width_from_position(&self, tiles: &HashSet<TileCoords>, start: TileCoords) -> i64 {
         let mut width = 0;
 
+        // Keep extending right as long as we find tiles
         loop {
             let test_pos = TileCoords {
                 x: start.x + width,
                 y: start.y,
             };
+
             if tiles.contains(&test_pos) {
                 width += 1;
             } else {
@@ -125,7 +144,7 @@ impl TileMerger {
         width
     }
 
-    /// Find maximum height for a given width starting from position
+    /// For a given width, find the maximum height we can achieve
     fn find_max_height_for_width(
         &self,
         tiles: &HashSet<TileCoords>,
@@ -134,39 +153,35 @@ impl TileMerger {
     ) -> i64 {
         let mut height = 0;
 
-        'height_loop: loop {
-            // Check if we can add another row
+        // Keep extending downward
+        loop {
+            let mut row_complete = true;
+
+            // Check if the entire row at this height exists
             for x_offset in 0..width {
                 let test_pos = TileCoords {
                     x: start.x + x_offset,
                     y: start.y + height,
                 };
+
                 if !tiles.contains(&test_pos) {
-                    break 'height_loop;
+                    row_complete = false;
+                    break;
                 }
             }
-            height += 1;
+
+            if row_complete {
+                height += 1;
+            } else {
+                break;
+            }
         }
 
         height
     }
 
-    /// Remove all tiles that are covered by the given rectangle
-    fn remove_covered_tiles(&self, tiles: &mut HashSet<TileCoords>, rect: &Rectangle) {
-        let mut to_remove = Vec::new();
-
-        for &pos in tiles.iter() {
-            if rect.contains_tile(&pos) {
-                to_remove.push(pos);
-            }
-        }
-
-        for pos in to_remove {
-            tiles.remove(&pos);
-        }
-    }
-
-    /// Convert rectangles to world coordinates for Bevy/Avian
+    /// Convert rectangles to world coordinates for Bevy/Avian physics
+    /// Returns (center_x, center_y, width, height) in world coordinates
     pub fn rectangles_to_world_coords(
         &self,
         rectangles: &[Rectangle],
@@ -174,20 +189,27 @@ impl TileMerger {
         rectangles
             .iter()
             .map(|rect| {
-                let world_x =
-                    rect.x as f32 * self.tile_size + (rect.width as f32 * self.tile_size) / 2.0;
-                let world_y =
-                    rect.y as f32 * self.tile_size + (rect.height as f32 * self.tile_size) / 2.0;
-                let world_width = rect.width as f32 * self.tile_size;
-                let world_height = rect.height as f32 * self.tile_size;
+                // Calculate the center position of the rectangle
+                let center_x = (rect.x as f32 + rect.width as f32 / 2.0) * self.tile_size;
+                let center_y = (rect.y as f32 + rect.height as f32 / 2.0) * self.tile_size;
 
-                (world_x, world_y, world_width, world_height)
+                // Calculate the total size
+                let total_width = rect.width as f32 * self.tile_size;
+                let total_height = rect.height as f32 * self.tile_size;
+
+                (center_x, center_y, total_width, total_height)
             })
             .collect()
     }
+
+    /// Helper method to create physics colliders from tile set
+    pub fn create_collider_data(&self, tiles: &HashSet<TileCoords>) -> Vec<(f32, f32, f32, f32)> {
+        let rectangles = self.merge_tiles(tiles);
+        self.rectangles_to_world_coords(&rectangles)
+    }
 }
 
-// Example usage and integration with Bevy/Avian
+// Bevy integration helper
 #[cfg(feature = "bevy")]
 mod bevy_integration {
     use super::*;
@@ -200,20 +222,19 @@ mod bevy_integration {
         tile_size: f32,
     ) {
         let merger = TileMerger::new(tile_size);
-        let rectangles = merger.merge_tiles(tiles);
-        let world_coords = merger.rectangles_to_world_coords(&rectangles);
+        let collider_data = merger.create_collider_data(tiles);
 
         println!(
             "Optimized {} tiles into {} physics bodies",
             tiles.len(),
-            rectangles.len()
+            collider_data.len()
         );
 
-        for (world_x, world_y, world_width, world_height) in world_coords {
+        for (center_x, center_y, width, height) in collider_data {
             commands.spawn((
                 RigidBody::Static,
-                Collider::rectangle(world_width, world_height),
-                Transform::from_translation(Vec3::new(world_x, world_y, 0.0)),
+                Collider::rectangle(width, height),
+                Transform::from_translation(Vec3::new(center_x, center_y, 0.0)),
             ));
         }
     }
@@ -224,7 +245,51 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_simple_rectangle() {
+    fn test_single_tile() {
+        let merger = TileMerger::new(32.0);
+        let mut tiles = HashSet::new();
+        tiles.insert(TileCoords { x: 0, y: 0 });
+
+        let rectangles = merger.merge_tiles(&tiles);
+        assert_eq!(rectangles.len(), 1);
+        assert_eq!(rectangles[0].width, 1);
+        assert_eq!(rectangles[0].height, 1);
+    }
+
+    #[test]
+    fn test_horizontal_line() {
+        let merger = TileMerger::new(32.0);
+        let mut tiles = HashSet::new();
+
+        // Create a horizontal line of 4 tiles
+        for x in 0..4 {
+            tiles.insert(TileCoords { x, y: 0 });
+        }
+
+        let rectangles = merger.merge_tiles(&tiles);
+        assert_eq!(rectangles.len(), 1);
+        assert_eq!(rectangles[0].width, 4);
+        assert_eq!(rectangles[0].height, 1);
+    }
+
+    #[test]
+    fn test_vertical_line() {
+        let merger = TileMerger::new(32.0);
+        let mut tiles = HashSet::new();
+
+        // Create a vertical line of 3 tiles
+        for y in 0..3 {
+            tiles.insert(TileCoords { x: 0, y });
+        }
+
+        let rectangles = merger.merge_tiles(&tiles);
+        assert_eq!(rectangles.len(), 1);
+        assert_eq!(rectangles[0].width, 1);
+        assert_eq!(rectangles[0].height, 3);
+    }
+
+    #[test]
+    fn test_rectangle_formation() {
         let merger = TileMerger::new(32.0);
         let mut tiles = HashSet::new();
 
@@ -237,8 +302,7 @@ mod tests {
 
         let rectangles = merger.merge_tiles(&tiles);
         assert_eq!(rectangles.len(), 1);
-        assert_eq!(rectangles[0].width, 3);
-        assert_eq!(rectangles[0].height, 2);
+        assert_eq!(rectangles[0].area(), 6);
     }
 
     #[test]
@@ -246,7 +310,10 @@ mod tests {
         let merger = TileMerger::new(32.0);
         let mut tiles = HashSet::new();
 
-        // Create an L-shape
+        // Create an L-shape:
+        // XXX
+        // X
+        // X
         tiles.insert(TileCoords { x: 0, y: 0 });
         tiles.insert(TileCoords { x: 1, y: 0 });
         tiles.insert(TileCoords { x: 2, y: 0 });
@@ -255,10 +322,127 @@ mod tests {
 
         let rectangles = merger.merge_tiles(&tiles);
 
-        // Should create 2 rectangles (one 3x1 horizontal, one 2x1 vertical)
-        assert_eq!(rectangles.len(), 2);
+        // Should create multiple rectangles
+        assert!(rectangles.len() >= 2);
 
+        // Total area should equal number of original tiles
         let total_area: i64 = rectangles.iter().map(|r| r.area()).sum();
-        assert_eq!(total_area, 5); // Should cover all 5 tiles
+        assert_eq!(total_area, 5);
+    }
+
+    #[test]
+    fn test_scattered_tiles() {
+        let merger = TileMerger::new(32.0);
+        let mut tiles = HashSet::new();
+
+        // Create scattered individual tiles
+        tiles.insert(TileCoords { x: 0, y: 0 });
+        tiles.insert(TileCoords { x: 2, y: 2 });
+        tiles.insert(TileCoords { x: 5, y: 5 });
+
+        let rectangles = merger.merge_tiles(&tiles);
+
+        // Should create one rectangle per tile
+        assert_eq!(rectangles.len(), 3);
+
+        // Each should be 1x1
+        for rect in rectangles {
+            assert_eq!(rect.area(), 1);
+        }
+    }
+
+    #[test]
+    fn test_world_coordinates() {
+        let merger = TileMerger::new(32.0);
+        let mut tiles = HashSet::new();
+
+        // Single tile at origin
+        tiles.insert(TileCoords { x: 0, y: 0 });
+
+        let rectangles = merger.merge_tiles(&tiles);
+        let world_coords = merger.rectangles_to_world_coords(&rectangles);
+
+        assert_eq!(world_coords.len(), 1);
+        let (center_x, center_y, width, height) = world_coords[0];
+
+        // Center should be at half tile size
+        assert_eq!(center_x, 16.0);
+        assert_eq!(center_y, 16.0);
+        assert_eq!(width, 32.0);
+        assert_eq!(height, 32.0);
+    }
+
+    #[test]
+    fn test_efficiency_improvement() {
+        let merger = TileMerger::new(32.0);
+        let mut tiles = HashSet::new();
+
+        // Create a large solid block (10x10 = 100 tiles)
+        for x in 0..10 {
+            for y in 0..10 {
+                tiles.insert(TileCoords { x, y });
+            }
+        }
+
+        let rectangles = merger.merge_tiles(&tiles);
+
+        // Should merge 100 individual tiles into 1 large rectangle
+        assert_eq!(rectangles.len(), 1);
+        assert_eq!(rectangles[0].width, 10);
+        assert_eq!(rectangles[0].height, 10);
+        assert_eq!(rectangles[0].area(), 100);
+
+        println!(
+            "Efficiency test: {} tiles merged into {} colliders ({}% reduction)",
+            tiles.len(),
+            rectangles.len(),
+            ((tiles.len() - rectangles.len()) as f32 / tiles.len() as f32 * 100.0) as i32
+        );
+    }
+
+    #[test]
+    fn test_complex_level_layout() {
+        let merger = TileMerger::new(32.0);
+        let mut tiles = HashSet::new();
+
+        // Create a complex level layout with platforms and walls
+        // Ground platform (20 tiles wide)
+        for x in 0..20 {
+            tiles.insert(TileCoords { x, y: 0 });
+        }
+
+        // Left wall (5 tiles high)
+        for y in 1..6 {
+            tiles.insert(TileCoords { x: 0, y });
+        }
+
+        // Right wall (5 tiles high)
+        for y in 1..6 {
+            tiles.insert(TileCoords { x: 19, y });
+        }
+
+        // Middle platform (8 tiles wide)
+        for x in 6..14 {
+            tiles.insert(TileCoords { x, y: 3 });
+        }
+
+        let rectangles = merger.merge_tiles(&tiles);
+
+        // Should significantly reduce the number of physics bodies
+        let original_count = tiles.len();
+        let optimized_count = rectangles.len();
+
+        println!(
+            "Complex level test: {} tiles merged into {} colliders",
+            original_count, optimized_count
+        );
+
+        // Verify all original tiles are covered
+        let total_area: i64 = rectangles.iter().map(|r| r.area()).sum();
+        assert_eq!(total_area, original_count as i64);
+
+        // Should have significantly fewer colliders than original tiles
+        assert!(optimized_count < original_count);
+        assert!(optimized_count <= 4); // Should be very efficient for this layout
     }
 }

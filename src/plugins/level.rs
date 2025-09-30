@@ -1,17 +1,16 @@
 use std::collections::HashSet;
 
-use avian2d::prelude::{Collider, RigidBody};
+use avian2d::prelude::{Collider, CollisionLayers, RigidBody};
 use bevy::prelude::*;
 
 use crate::{
-    bundles::{
-        level::{LevelBundle, StaticLevelData, TileCoords},
-        player::PlayerBundle,
-    },
-    constants::{self, TILE_SIZE},
+    bundles::level::{LevelBundle, StaticLevelData, TileCoords},
+    constants::{self, GameLayer, TILE_SIZE},
     states::GameState,
     tile_merger::TileMerger,
 };
+
+use super::player::PlayerSpawnEvent;
 
 pub struct LevelPlugin;
 
@@ -22,7 +21,11 @@ impl Plugin for LevelPlugin {
     }
 }
 
-pub fn setup_level(mut commands: Commands, asset_server: Res<AssetServer>) {
+pub fn setup_level(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut event_writer: EventWriter<PlayerSpawnEvent>,
+) {
     let project = ldtk_rust::Project::new("assets/ldtk/project.ldtk");
     let level_data = project
         .levels
@@ -89,6 +92,10 @@ pub fn setup_level(mut commands: Commands, asset_server: Res<AssetServer>) {
                                     center_y * -1.0, // Flip Y coordinate for Bevy
                                     0.0,
                                 ),
+                                CollisionLayers::new(
+                                    GameLayer::LevelGeometry,
+                                    [GameLayer::Player, GameLayer::Default],
+                                ),
                             ))
                             .id();
 
@@ -100,14 +107,11 @@ pub fn setup_level(mut commands: Commands, asset_server: Res<AssetServer>) {
                         match entity.identifier.as_str() {
                             constants::entities::PLAYER_START => {
                                 println!("Spawning player, data: {:?}", entity);
-                                commands.spawn(PlayerBundle {
-                                    transform: Transform::from_xyz(
-                                        entity.world_x.unwrap() as f32,
-                                        (entity.world_y.unwrap() * -1) as f32,
-                                        0.0,
-                                    ),
-                                    ..Default::default()
-                                });
+                                event_writer.write(PlayerSpawnEvent(Transform::from_xyz(
+                                    entity.world_x.unwrap() as f32,
+                                    (entity.world_y.unwrap() * -1) as f32,
+                                    1.0,
+                                )));
                             }
                             _ => {
                                 warn!("unhandled entity id: {:?}", entity.identifier)

@@ -1,8 +1,3 @@
-// Cargo.toml dependencies:
-// [dependencies]
-// bevy = "0.16"
-// avian2d = "0.1"
-
 use avian2d::prelude::*;
 use bevy::prelude::*;
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
@@ -15,13 +10,12 @@ mod plugins;
 mod states;
 mod tile_merger;
 
-use bevy_tnua::{TnuaUserControlsSystemSet, prelude::TnuaControllerPlugin};
-use bevy_tnua_avian2d::TnuaAvian2dPlugin;
-//use bundles::spawn_point::{PlayerSpawnBundle, PlayerSpawnPlugin, RespawnPlayer};
+use collision::CollisionPlugin;
 pub use constants::multiply_by_tile_size;
+use gravity::GravityPlugin;
+use leafwing_input_manager::plugin::InputManagerPlugin;
 use level::LevelPlugin;
-use level_enums::*;
-use player::apply_controls;
+use player::{PlayerAction, PlayerPlugin};
 use plugins::*;
 use states::GameState;
 
@@ -32,21 +26,18 @@ fn main() {
         .add_plugins((
             DefaultPlugins.set(ImagePlugin::default_nearest()),
             PhysicsPlugins::default().with_length_unit(constants::TILE_SIZE),
-            TnuaAvian2dPlugin::new(FixedUpdate),
             PhysicsDebugPlugin::default(),
-            TnuaControllerPlugin::new(FixedUpdate),
             EguiPlugin::default(),
             WorldInspectorPlugin::new(),
+            InputManagerPlugin::<PlayerAction>::default(),
+            PlayerPlugin,
             CameraPlugin,
             GamePlugin,
             LevelPlugin,
+            CollisionPlugin,
+            GravityPlugin,
         ))
-        .add_systems(
-            FixedUpdate,
-            apply_controls.in_set(TnuaUserControlsSystemSet),
-        )
         .insert_resource(Gravity(Vec2::NEG_Y * multiply_by_tile_size(10)))
-        //.add_systems(Startup, setup_player)
         .init_state::<GameState>()
         .run();
 }

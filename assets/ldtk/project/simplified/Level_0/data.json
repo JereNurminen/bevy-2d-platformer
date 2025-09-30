@@ -17,10 +17,10 @@
 				"id": "player_start",
 				"iid": "49e27ff0-8560-11f0-beb1-3d62ec8a67d4",
 				"layer": "entities",
-				"x": 144,
-				"y": 32,
+				"x": 176,
+				"y": 48,
 				"width": 32,
-				"height": 64,
+				"height": 48,
 				"color": 39387,
 				"customFields" : {}
 			}

@@ -14,7 +14,15 @@ impl Plugin for CameraPlugin {
 }
 
 fn setup_camera(mut commands: Commands) {
-    commands.spawn(CameraBundle::default());
+    commands.spawn((
+        CameraBundle::default(),
+        Projection::from(OrthographicProjection {
+            scaling_mode: bevy::render::camera::ScalingMode::FixedVertical {
+                viewport_height: 400.0,
+            },
+            ..OrthographicProjection::default_2d()
+        }),
+    ));
 }
 
 fn update_camera(
@@ -28,6 +36,8 @@ fn update_camera(
         return;
     };
 
+    let offset_y = 64.0;
+
     camera_transform.translation.x = player_transform.translation.x;
-    camera_transform.translation.y = player_transform.translation.y;
+    camera_transform.translation.y = player_transform.translation.y + offset_y;
 }

@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use bevy::{prelude::*, time::Stopwatch};
 
@@ -15,6 +15,8 @@ use crate::{
 };
 
 use super::{
+    animation::{AnimationKey, AnimationPlugin},
+    animation_library::{AnimationConfig, AnimationLibrary},
     collision::{CollisionBundle, CollisionConfig, GroundedStopwatch, IsGrounded, Velocity},
     gravity::EntityGravity,
 };
@@ -50,7 +52,21 @@ pub struct CoyoteTime(pub Duration);
 #[derive(Component, Default)]
 pub struct JumpCooldownTimer(pub Timer);
 
-pub fn spawn_player(mut event_reader: EventReader<PlayerSpawnEvent>, mut commands: Commands) {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum PlayerAnimations {
+    Idle,
+    Run,
+    Jump,
+}
+impl AnimationKey for PlayerAnimations {}
+
+pub fn spawn_player(
+    mut event_reader: EventReader<PlayerSpawnEvent>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
+    animation_library: Res<AnimationLibrary>,
+) {
     let walk_speed = multiply_by_tile_size(10);
     let walk_acceleration = walk_speed * 2.5;
     let walk_deceleration = walk_acceleration * 2.0;
@@ -59,6 +75,12 @@ pub fn spawn_player(mut event_reader: EventReader<PlayerSpawnEvent>, mut command
     let gravity = multiply_by_tile_size(30);
     let max_fall_speed = multiply_by_tile_size(15);
     let gravity_immunity_duration = Duration::from_millis(300);
+
+    // Check if animation library is ready
+    let Some(player_anim_data) = &animation_library.player else {
+        // Animation data not loaded yet, skip spawning
+        return;
+    };
 
     if let Some(event) = event_reader.read().last() {
         let input_map = InputMap::new([
@@ -69,14 +91,26 @@ pub fn spawn_player(mut event_reader: EventReader<PlayerSpawnEvent>, mut command
             (PlayerAction::Right, KeyCode::KeyD),
         ]);
 
+        // Configure player animations
+        let animation_configs = HashMap::from([
+            (PlayerAnimations::Idle, AnimationConfig::looping("idle")),
+            (PlayerAnimations::Run, AnimationConfig::looping("run")),
+            (PlayerAnimations::Jump, AnimationConfig::once("jump")),
+        ]);
+
+        let animations = AnimationLibrary::create_animation_bundle(
+            player_anim_data,
+            "sprites/player.png",
+            animation_configs,
+            PlayerAnimations::Idle,
+            &asset_server,
+            &mut texture_atlas_layouts,
+        );
+
         commands
             .spawn((
                 Player,
-                Sprite {
-                    color: Color::srgb(0.3, 0.7, 0.3),
-                    custom_size: Some(Vec2::new(PLAYER_WIDTH, PLAYER_HEIGHT)),
-                    ..default()
-                },
+                animations,
                 event.0,
                 RigidBody::Kinematic,
                 Collider::rectangle(PLAYER_WIDTH, PLAYER_HEIGHT),
@@ -222,14 +256,16 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<PlayerSpawnEvent>().add_systems(
-            Update,
-            (
-                spawn_player,
-                apply_controls,
-                toggle_gravity,
-                debug_player_colors,
-            ),
-        );
+        app.add_event::<PlayerSpawnEvent>()
+            .add_systems(
+                Update,
+                (
+                    spawn_player,
+                    apply_controls,
+                    toggle_gravity,
+                    //debug_player_colors,
+                ),
+            )
+            .add_plugins(AnimationPlugin::<PlayerAnimations>::default());
     }
 }

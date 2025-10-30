@@ -1,7 +1,10 @@
+use aseprite_deserialize::Aseprite;
 use avian2d::prelude::*;
 use bevy::prelude::*;
+use bevy_common_assets::json::JsonAssetPlugin;
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 
+mod aseprite_deserialize;
 mod bundles;
 mod components;
 mod constants;
@@ -10,6 +13,7 @@ mod plugins;
 mod states;
 mod tile_merger;
 
+use animation_library::AnimationLibraryPlugin;
 use collision::CollisionPlugin;
 pub use constants::multiply_by_tile_size;
 use gravity::GravityPlugin;
@@ -29,7 +33,9 @@ fn main() {
             PhysicsDebugPlugin::default(),
             EguiPlugin::default(),
             WorldInspectorPlugin::new(),
+            JsonAssetPlugin::<Aseprite>::new(&["json"]),
             InputManagerPlugin::<PlayerAction>::default(),
+            AnimationLibraryPlugin,
             PlayerPlugin,
             CameraPlugin,
             GamePlugin,

@@ -6,7 +6,7 @@ use crate::aseprite_deserialize::{Aseprite, FrameTag};
 
 use super::animation::{
     Animation, AnimationBundle, AnimationFrame, AnimationKey, AnimationMap, AnimationTimer,
-    CurrentAnimation, OnAnimationEndAction,
+    CurrentAnimation, NextAnimation, OnAnimationEndAction,
 };
 
 /// Complete animation metadata for a sprite
@@ -149,6 +149,7 @@ impl AnimationLibrary {
 
         AnimationBundle {
             current_animation: CurrentAnimation::new(default_animation),
+            next_animation: NextAnimation { key: None },
             timer: AnimationTimer::default(),
             animations: AnimationMap {
                 animations,

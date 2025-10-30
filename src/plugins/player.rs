@@ -15,7 +15,7 @@ use crate::{
 };
 
 use super::{
-    animation::{AnimationKey, AnimationPlugin},
+    animation::{AnimationKey, AnimationPlugin, CurrentAnimation, NextAnimation},
     animation_library::{AnimationConfig, AnimationLibrary},
     collision::{CollisionBundle, CollisionConfig, GroundedStopwatch, IsGrounded, Velocity},
     gravity::EntityGravity,
@@ -182,6 +182,8 @@ pub fn apply_controls(
             &WalkAcceleration,
             &GroundDeceleration,
             &mut JumpCooldownTimer,
+            &mut Sprite,
+            &mut NextAnimation<PlayerAnimations>,
         ),
         With<Player>,
     >,
@@ -198,20 +200,29 @@ pub fn apply_controls(
         walk_acceleration,
         ground_deceleration,
         mut jump_cooldown_timer,
+        mut sprite,
+        mut next_animation,
     ) in query.iter_mut()
     {
         let mut direction = Vec2::ZERO;
 
         jump_cooldown_timer.0.tick(time.delta());
 
+        let mut is_running = false;
+        let mut just_jumped = false;
+
         if action_state.pressed(&PlayerAction::Left) {
             if velocity.0.x > -walk_speed.0 {
                 direction.x = -walk_acceleration.0 * time.delta_secs();
             }
+            sprite.flip_x = true;
+            is_running = true;
         } else if action_state.pressed(&PlayerAction::Right) {
             if velocity.0.x < walk_speed.0 {
                 direction.x = walk_acceleration.0 * time.delta_secs();
             }
+            sprite.flip_x = false;
+            is_running = true;
         } else {
             // Moving left but not holding left
             if velocity.0.x < 0.0 {
@@ -234,11 +245,27 @@ pub fn apply_controls(
                 direction.y += jump_force.0;
                 after_jump_gravity_immunity_timer.0.reset();
                 jump_cooldown_timer.0.reset();
+                just_jumped = true;
             } else {
             }
         }
 
         velocity.0 += direction;
+
+        match (is_grounded.0, just_jumped, is_running) {
+            (false, _, _) | (true, true, _) => {
+                next_animation.key = Some(PlayerAnimations::Jump);
+                println!("Jump animation triggered");
+            }
+            (true, false, true) => {
+                next_animation.key = Some(PlayerAnimations::Run);
+                println!("Run animation triggered");
+            }
+            (true, false, false) => {
+                next_animation.key = Some(PlayerAnimations::Idle);
+                println!("Idle animation triggered");
+            }
+        }
     }
 }
 

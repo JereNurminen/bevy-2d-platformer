@@ -2,10 +2,13 @@ use std::{collections::HashMap, default, marker::PhantomData, time::Duration};
 
 use bevy::prelude::*;
 
+pub trait AnimationStateKey: Clone + Eq + std::hash::Hash + Send + Sync + 'static {}
+
 pub trait AnimationKey: Clone + Eq + std::hash::Hash + Send + Sync + 'static {}
 
 #[derive(Bundle)]
 pub struct AnimationBundle<K: AnimationKey> {
+    pub next_animation: NextAnimation<K>,
     pub current_animation: CurrentAnimation<K>,
     pub timer: AnimationTimer,
     pub animations: AnimationMap<K>,
@@ -15,6 +18,11 @@ pub struct AnimationBundle<K: AnimationKey> {
 #[derive(Component)]
 pub struct CurrentAnimation<K: AnimationKey> {
     pub key: K,
+}
+
+#[derive(Component)]
+pub struct NextAnimation<K: AnimationKey> {
+    pub key: Option<K>,
 }
 
 impl<K: AnimationKey> CurrentAnimation<K> {
@@ -78,6 +86,7 @@ impl<K: AnimationKey> AnimationBundle<K> {
 
         AnimationBundle {
             current_animation: default_animation,
+            next_animation: NextAnimation { key: None },
             timer: AnimationTimer(timer),
             animations: AnimationMap { animations, frames },
             sprite,
@@ -87,16 +96,41 @@ impl<K: AnimationKey> AnimationBundle<K> {
 
 pub fn update_animations<K: AnimationKey>(
     mut query: Query<(
-        &CurrentAnimation<K>,
+        &mut CurrentAnimation<K>,
+        &mut NextAnimation<K>,
         &mut Sprite,
         &mut AnimationTimer,
         &AnimationMap<K>,
     )>,
     time: Res<Time>,
 ) {
-    for (current_animation, mut sprite, mut timer, animation_map) in query.iter_mut() {
+    for (mut current_animation, mut next_animation, mut sprite, mut timer, animation_map) in
+        query.iter_mut()
+    {
+        let is_starting_next_animation =
+            if let Some(next_animation_key) = next_animation.key.clone() {
+                if next_animation_key != current_animation.key {
+                    let next_animation_clip = animation_map
+                        .animations
+                        .get(&next_animation_key)
+                        .expect("Current animation key should always exist in map");
+                    println!(
+                        "Next animation: {:?} - {:?}",
+                        next_animation_clip.first_index, next_animation_clip.last_index
+                    );
+                    current_animation.key = next_animation_key;
+                    next_animation.key = None;
+                    timer.0.reset();
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
         timer.0.tick(time.delta());
-        if timer.0.just_finished() {
+        if timer.0.just_finished() || is_starting_next_animation {
             // Get the current animation from the map using the key
             let animation = animation_map
                 .animations
@@ -104,7 +138,11 @@ pub fn update_animations<K: AnimationKey>(
                 .expect("Current animation key should always exist in map");
 
             let next_frame = if let Some(atlas) = &mut sprite.texture_atlas {
-                let next_frame_index = atlas.index + 1;
+                let next_frame_index = if is_starting_next_animation {
+                    animation.first_index
+                } else {
+                    atlas.index + 1
+                };
                 if next_frame_index > animation.last_index {
                     match animation.on_end {
                         OnAnimationEndAction::Loop => {

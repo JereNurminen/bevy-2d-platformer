@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use bevy::prelude::*;
 
-use crate::aseprite_deserialize::{Aseprite, FrameTag};
+use crate::aseprite_deserialize::{Aseprite, Slice};
 
 use super::animation::{
     Animation, AnimationBundle, AnimationFrame, AnimationKey, AnimationMap, AnimationTimer,
@@ -20,6 +20,8 @@ pub struct AnimationData {
     pub sheet_size: UVec2,
     /// Individual frame size
     pub frame_size: UVec2,
+    /// Slices from Aseprite (e.g., hitboxes)
+    pub slices: Vec<Slice>,
 }
 
 /// Metadata for a named animation (from Aseprite frame tags)
@@ -213,6 +215,7 @@ pub fn aseprite_to_animation_data(aseprite: &Aseprite) -> AnimationData {
         animations,
         sheet_size: UVec2::new(aseprite.meta.size.w as u32, aseprite.meta.size.h as u32),
         frame_size,
+        slices: aseprite.meta.slices.clone(),
     }
 }
 

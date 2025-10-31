@@ -25,7 +25,7 @@ pub struct Frame {
     pub duration: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Rect {
     pub x: i32,
     pub y: i32,
@@ -61,13 +61,17 @@ pub struct FrameTag {
     pub color: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Slice {
-    // Aseprite 'slices' can be nested structures; leave minimal fields for now.
-    // Keep as generic so empty slices array deserializes fine.
-    pub name: Option<String>,
-    pub color: Option<String>,
-    pub keys: Option<Vec<serde_json::Value>>,
+    pub name: String,
+    pub color: String,
+    pub keys: Vec<SliceKey>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SliceKey {
+    pub frame: usize,
+    pub bounds: Rect,
 }
 
 impl Aseprite {
@@ -88,6 +92,16 @@ impl Aseprite {
             map.insert(tag.name.clone(), slice);
         }
         map
+    }
+
+    /// Get the bounds for a named slice. Returns the first key's bounds if found.
+    pub fn get_slice_bounds(&self, slice_name: &str) -> Option<&Rect> {
+        self.meta
+            .slices
+            .iter()
+            .find(|s| s.name == slice_name)
+            .and_then(|s| s.keys.first())
+            .map(|k| &k.bounds)
     }
 }
 

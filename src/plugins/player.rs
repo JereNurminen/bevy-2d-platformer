@@ -107,15 +107,47 @@ pub fn spawn_player(
             &mut texture_atlas_layouts,
         );
 
+        // Get hitbox dimensions and offset from the slice data
+        let (hitbox_width, hitbox_height, hitbox_offset_x, hitbox_offset_y) = player_anim_data
+            .slices
+            .iter()
+            .find(|s| s.name == "hitbox")
+            .and_then(|s| s.keys.first())
+            .map(|key| {
+                let bounds = &key.bounds;
+                // Convert from pixel coordinates to game world units
+                // The bounds are relative to the sprite, with origin at top-left
+                // We need to center the hitbox, so calculate offset from sprite center
+                let sprite_width = 64.0; // from the sprite source size
+                let sprite_height = 64.0;
+
+                let width = bounds.w as f32;
+                let height = bounds.h as f32;
+
+                // Calculate center offset from sprite center
+                // Aseprite coords: (0,0) is top-left, Y increases downward
+                // Bevy coords: (0,0) is center, Y increases upward
+                let offset_x = (bounds.x as f32 + width / 2.0) - (sprite_width / 2.0);
+                let offset_y = (sprite_height / 2.0) - (bounds.y as f32 + height / 2.0);
+
+                (width, height, offset_x, offset_y)
+            })
+            .unwrap_or((PLAYER_WIDTH, PLAYER_HEIGHT, 0.0, 0.0));
+
         commands
             .spawn((
                 Player,
                 animations,
                 event.0,
                 RigidBody::Kinematic,
-                Collider::rectangle(PLAYER_WIDTH, PLAYER_HEIGHT),
                 LockedAxes::ROTATION_LOCKED,
             ))
+            .with_children(|children| {
+                children.spawn((
+                    Collider::rectangle(hitbox_width, hitbox_height),
+                    Transform::from_xyz(hitbox_offset_x, hitbox_offset_y, 0.0),
+                ));
+            })
             .insert(CollisionBundle {
                 grounded_stopwatch: GroundedStopwatch(Stopwatch::new()),
                 config: CollisionConfig {

@@ -123,7 +123,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 64, "h": 64 },
     "sourceSize": { "w": 64, "h": 64 },
-    "duration": 100
+    "duration": 80
    },
    {
     "filename": "player #run 1.aseprite",
@@ -132,7 +132,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 64, "h": 64 },
     "sourceSize": { "w": 64, "h": 64 },
-    "duration": 100
+    "duration": 80
    },
    {
     "filename": "player #run 2.aseprite",
@@ -141,7 +141,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 64, "h": 64 },
     "sourceSize": { "w": 64, "h": 64 },
-    "duration": 100
+    "duration": 80
    },
    {
     "filename": "player #run 3.aseprite",
@@ -150,7 +150,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 64, "h": 64 },
     "sourceSize": { "w": 64, "h": 64 },
-    "duration": 100
+    "duration": 80
    },
    {
     "filename": "player #run 4.aseprite",
@@ -159,7 +159,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 64, "h": 64 },
     "sourceSize": { "w": 64, "h": 64 },
-    "duration": 100
+    "duration": 80
    },
    {
     "filename": "player #run 5.aseprite",
@@ -168,7 +168,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 64, "h": 64 },
     "sourceSize": { "w": 64, "h": 64 },
-    "duration": 100
+    "duration": 80
    },
    {
     "filename": "player #run 6.aseprite",
@@ -177,7 +177,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 64, "h": 64 },
     "sourceSize": { "w": 64, "h": 64 },
-    "duration": 100
+    "duration": 80
    },
    {
     "filename": "player #jump 0.aseprite",
@@ -211,6 +211,7 @@
    { "name": "jump", "from": 20, "to": 21, "direction": "forward", "color": "#000000ff" }
   ],
   "slices": [
+   { "name": "hitbox", "color": "#0000ffff", "keys": [{ "frame": 0, "bounds": {"x": 19, "y": 7, "w": 26, "h": 57 } }, { "frame": 4, "bounds": {"x": 19, "y": 7, "w": 26, "h": 57 } }, { "frame": 9, "bounds": {"x": 19, "y": 7, "w": 26, "h": 57 } }] }
   ]
  }
 }

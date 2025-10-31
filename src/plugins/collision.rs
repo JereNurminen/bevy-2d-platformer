@@ -74,24 +74,37 @@ fn shape_cast(
 
 pub fn check_grounded_state(
     spatial_query: SpatialQuery,
-    mut query: Query<(
-        &mut IsGrounded,
-        &CollisionConfig,
-        &Transform,
-        &Collider,
-        Option<&mut GroundedStopwatch>,
-        &mut Velocity,
-    )>,
+    mut query: Query<
+        (
+            &mut IsGrounded,
+            &CollisionConfig,
+            &Transform,
+            &Children,
+            Option<&mut GroundedStopwatch>,
+            &mut Velocity,
+        ),
+        Without<Collider>,
+    >,
+    collider_query: Query<(&Collider, &Transform)>,
     time: Res<Time>,
 ) {
-    for (mut is_grounded, config, transform, collider, grounded_stopwatch, mut velocity) in
+    for (mut is_grounded, config, transform, children, grounded_stopwatch, mut velocity) in
         query.iter_mut()
     {
+        // Find the collider and its transform from children
+        let collider_data = children
+            .iter()
+            .find_map(|child| collider_query.get(child).ok());
+
+        let Some((collider, collider_transform)) = collider_data else {
+            continue;
+        };
+
         let hit = shape_cast(
             &spatial_query,
             Vec2 {
-                x: transform.translation.x,
-                y: transform.translation.y,
+                x: transform.translation.x + collider_transform.translation.x,
+                y: transform.translation.y + collider_transform.translation.y,
             },
             Vec2::NEG_Y,
             config.ground_check_distance,
@@ -116,29 +129,42 @@ pub fn check_grounded_state(
 
 pub fn check_ceiling_state(
     spatial_query: SpatialQuery,
-    mut query: Query<(
-        &mut IsTouchingCeiling,
-        &CollisionConfig,
-        &Transform,
-        &Collider,
-        &mut Velocity,
-        Option<&mut AfterJumpGravityImmunityTimer>,
-    )>,
+    mut query: Query<
+        (
+            &mut IsTouchingCeiling,
+            &CollisionConfig,
+            &Transform,
+            &Children,
+            &mut Velocity,
+            Option<&mut AfterJumpGravityImmunityTimer>,
+        ),
+        Without<Collider>,
+    >,
+    collider_query: Query<(&Collider, &Transform)>,
 ) {
     for (
         mut is_touching_ceiling,
         config,
         transform,
-        collider,
+        children,
         mut velocity,
         after_jump_gravity_immunity_timer,
     ) in query.iter_mut()
     {
+        // Find the collider and its transform from children
+        let collider_data = children
+            .iter()
+            .find_map(|child| collider_query.get(child).ok());
+
+        let Some((collider, collider_transform)) = collider_data else {
+            continue;
+        };
+
         let hit = shape_cast(
             &spatial_query,
             Vec2 {
-                x: transform.translation.x,
-                y: transform.translation.y,
+                x: transform.translation.x + collider_transform.translation.x,
+                y: transform.translation.y + collider_transform.translation.y,
             },
             Vec2::Y,
             config.ceiling_check_distance,
@@ -162,20 +188,33 @@ pub fn check_ceiling_state(
 
 pub fn check_wall_left_state(
     spatial_query: SpatialQuery,
-    mut query: Query<(
-        &mut IsTouchingWallLeft,
-        &CollisionConfig,
-        &Transform,
-        &Collider,
-        &mut Velocity,
-    )>,
+    mut query: Query<
+        (
+            &mut IsTouchingWallLeft,
+            &CollisionConfig,
+            &Transform,
+            &Children,
+            &mut Velocity,
+        ),
+        Without<Collider>,
+    >,
+    collider_query: Query<(&Collider, &Transform)>,
 ) {
-    for (mut is_touching_wall_left, config, transform, collider, mut velocity) in query.iter_mut() {
+    for (mut is_touching_wall_left, config, transform, children, mut velocity) in query.iter_mut() {
+        // Find the collider and its transform from children
+        let collider_data = children
+            .iter()
+            .find_map(|child| collider_query.get(child).ok());
+
+        let Some((collider, collider_transform)) = collider_data else {
+            continue;
+        };
+
         let hit = shape_cast(
             &spatial_query,
             Vec2 {
-                x: transform.translation.x,
-                y: transform.translation.y + 1.0,
+                x: transform.translation.x + collider_transform.translation.x,
+                y: transform.translation.y + collider_transform.translation.y + 1.0,
             },
             Vec2::NEG_X,
             config.wall_check_distance,
@@ -194,21 +233,34 @@ pub fn check_wall_left_state(
 
 pub fn check_wall_right_state(
     spatial_query: SpatialQuery,
-    mut query: Query<(
-        &mut IsTouchingWallRight,
-        &CollisionConfig,
-        &Transform,
-        &Collider,
-        &mut Velocity,
-    )>,
+    mut query: Query<
+        (
+            &mut IsTouchingWallRight,
+            &CollisionConfig,
+            &Transform,
+            &Children,
+            &mut Velocity,
+        ),
+        Without<Collider>,
+    >,
+    collider_query: Query<(&Collider, &Transform)>,
 ) {
-    for (mut is_touching_wall_right, config, transform, collider, mut velocity) in query.iter_mut()
+    for (mut is_touching_wall_right, config, transform, children, mut velocity) in query.iter_mut()
     {
+        // Find the collider and its transform from children
+        let collider_data = children
+            .iter()
+            .find_map(|child| collider_query.get(child).ok());
+
+        let Some((collider, collider_transform)) = collider_data else {
+            continue;
+        };
+
         let hit = shape_cast(
             &spatial_query,
             Vec2 {
-                x: transform.translation.x,
-                y: transform.translation.y + 1.0,
+                x: transform.translation.x + collider_transform.translation.x,
+                y: transform.translation.y + collider_transform.translation.y + 1.0,
             },
             Vec2::X,
             config.wall_check_distance,
@@ -228,19 +280,23 @@ pub fn check_wall_right_state(
 pub fn apply_velocity(
     spatial_query: SpatialQuery,
     time: Res<Time>,
-    mut query: Query<(
-        &CollisionConfig,
-        &Collider,
-        &mut Velocity,
-        &mut Transform,
-        Option<&IsTouchingWallLeft>,
-        Option<&IsTouchingWallRight>,
-        Option<&IsTouchingCeiling>,
-    )>,
+    mut query: Query<
+        (
+            &CollisionConfig,
+            &Children,
+            &mut Velocity,
+            &mut Transform,
+            Option<&IsTouchingWallLeft>,
+            Option<&IsTouchingWallRight>,
+            Option<&IsTouchingCeiling>,
+        ),
+        Without<Collider>,
+    >,
+    collider_query: Query<(&Collider, &Transform)>,
 ) {
     for (
         config,
-        collider,
+        children,
         mut velocity,
         mut transform,
         is_touching_wall_left,
@@ -248,6 +304,15 @@ pub fn apply_velocity(
         is_touching_ceiling,
     ) in query.iter_mut()
     {
+        // Find the collider and its transform from children
+        let collider_data = children
+            .iter()
+            .find_map(|child| collider_query.get(child).ok());
+
+        let Some((collider, collider_transform)) = collider_data else {
+            continue;
+        };
+
         if -1.0 < velocity.0.x && velocity.0.x < 1.0 {
             velocity.0.x = 0.0;
         }
@@ -278,8 +343,8 @@ pub fn apply_velocity(
         let hit = shape_cast(
             &spatial_query,
             Vec2 {
-                x: transform.translation.x,
-                y: transform.translation.y,
+                x: transform.translation.x + collider_transform.translation.x,
+                y: transform.translation.y + collider_transform.translation.y,
             },
             velocity.0.normalize(),
             target_distance,

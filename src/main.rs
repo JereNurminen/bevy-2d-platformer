@@ -21,6 +21,7 @@ use leafwing_input_manager::plugin::InputManagerPlugin;
 use level::LevelPlugin;
 use player::{PlayerAction, PlayerPlugin};
 use plugins::*;
+use projectile::ProjectilePlugin;
 use states::GameState;
 
 pub use constants::{entities, enums, layers, levels};
@@ -42,6 +43,7 @@ fn main() {
             LevelPlugin,
             CollisionPlugin,
             GravityPlugin,
+            ProjectilePlugin,
         ))
         .insert_resource(Gravity(Vec2::NEG_Y * multiply_by_tile_size(10)))
         .init_state::<GameState>()

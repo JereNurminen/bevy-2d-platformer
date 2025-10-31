@@ -4,6 +4,7 @@ use bevy::{prelude::*, time::Stopwatch};
 
 use avian2d::prelude::*;
 
+use bevy_inspector_egui::InspectorOptions;
 use leafwing_input_manager::{
     Actionlike,
     prelude::{ActionState, InputMap},
@@ -14,22 +15,93 @@ use crate::{
     constants::{GameLayer, PLAYER_HEIGHT, PLAYER_WIDTH, multiply_by_tile_size},
 };
 
+/// Represents a rectangular bounds with position and dimensions
+struct BoundsRect {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+}
+
+impl BoundsRect {
+    fn from_aseprite_rect(rect: &crate::aseprite_deserialize::Rect) -> Self {
+        Self {
+            x: rect.x as f32,
+            y: rect.y as f32,
+            width: rect.w as f32,
+            height: rect.h as f32,
+        }
+    }
+}
+
+/// Calculate offset from sprite center for a given bounds rectangle
+///
+/// Aseprite uses top-left origin, but Bevy sprites are centered.
+/// This converts bounds to an offset from the sprite's center point.
+///
+/// # Arguments
+/// * `bounds` - The rectangular bounds to convert
+/// * `sprite_width` - Total width of the sprite
+/// * `sprite_height` - Total height of the sprite
+/// * `flip_x` - Whether to flip the x-axis (for sprite mirroring)
+///
+/// # Returns
+/// Vec2 offset from sprite center
+fn calculate_sprite_offset(
+    bounds: &BoundsRect,
+    sprite_width: f32,
+    sprite_height: f32,
+    flip_x: bool,
+) -> Vec2 {
+    // Calculate center point of the bounds
+    let bounds_center_x = bounds.x + bounds.width / 2.0;
+    let bounds_center_y = bounds.y + bounds.height / 2.0;
+
+    // Calculate sprite center
+    let sprite_center_x = sprite_width / 2.0;
+    let sprite_center_y = sprite_height / 2.0;
+
+    // Calculate offset from sprite center
+    // X: positive means right of center
+    let offset_x = bounds_center_x - sprite_center_x;
+    // Y: Bevy uses bottom-up coordinates, Aseprite uses top-down
+    let offset_y = sprite_center_y - bounds_center_y;
+
+    // Apply horizontal flip if needed
+    let final_x = if flip_x { -offset_x } else { offset_x };
+
+    Vec2::new(final_x, offset_y)
+}
+
+/// Get sprite dimensions for the player
+/// This should match the actual sprite dimensions in the asset
+const PLAYER_SPRITE_WIDTH: f32 = 64.0;
+const PLAYER_SPRITE_HEIGHT: f32 = 64.0;
+
 use super::{
     animation::{AnimationKey, AnimationPlugin, CurrentAnimation, NextAnimation},
     animation_library::{AnimationConfig, AnimationLibrary},
     collision::{CollisionBundle, CollisionConfig, GroundedStopwatch, IsGrounded, Velocity},
     gravity::EntityGravity,
+    projectile::{ProjectileSpawnEvent, ProjectileVelocity},
 };
 
 #[derive(Event)]
 pub struct PlayerSpawnEvent(pub Transform);
+
+#[derive(Event)]
+pub struct PlayerShootEvent;
 
 #[derive(Actionlike, PartialEq, Eq, Hash, Clone, Copy, Debug, Reflect)]
 pub enum PlayerAction {
     Left,
     Right,
     Jump,
+    Shoot,
 }
+
+#[derive(Component, Default, Reflect, Resource, InspectorOptions)]
+pub struct BarrelPosition(pub Vec2);
 
 #[derive(Component, Default)]
 pub struct AfterJumpGravityImmunityTimer(pub Timer);
@@ -76,9 +148,7 @@ pub fn spawn_player(
     let max_fall_speed = multiply_by_tile_size(15);
     let gravity_immunity_duration = Duration::from_millis(300);
 
-    // Check if animation library is ready
     let Some(player_anim_data) = &animation_library.player else {
-        // Animation data not loaded yet, skip spawning
         return;
     };
 
@@ -89,6 +159,7 @@ pub fn spawn_player(
             (PlayerAction::Left, KeyCode::KeyA),
             (PlayerAction::Right, KeyCode::ArrowRight),
             (PlayerAction::Right, KeyCode::KeyD),
+            (PlayerAction::Shoot, KeyCode::KeyJ),
         ]);
 
         // Configure player animations
@@ -108,31 +179,22 @@ pub fn spawn_player(
         );
 
         // Get hitbox dimensions and offset from the slice data
-        let (hitbox_width, hitbox_height, hitbox_offset_x, hitbox_offset_y) = player_anim_data
+        let (hitbox_width, hitbox_height, hitbox_offset) = player_anim_data
             .slices
             .iter()
             .find(|s| s.name == "hitbox")
             .and_then(|s| s.keys.first())
             .map(|key| {
-                let bounds = &key.bounds;
-                // Convert from pixel coordinates to game world units
-                // The bounds are relative to the sprite, with origin at top-left
-                // We need to center the hitbox, so calculate offset from sprite center
-                let sprite_width = 64.0; // from the sprite source size
-                let sprite_height = 64.0;
-
-                let width = bounds.w as f32;
-                let height = bounds.h as f32;
-
-                // Calculate center offset from sprite center
-                // Aseprite coords: (0,0) is top-left, Y increases downward
-                // Bevy coords: (0,0) is center, Y increases upward
-                let offset_x = (bounds.x as f32 + width / 2.0) - (sprite_width / 2.0);
-                let offset_y = (sprite_height / 2.0) - (bounds.y as f32 + height / 2.0);
-
-                (width, height, offset_x, offset_y)
+                let bounds = BoundsRect::from_aseprite_rect(&key.bounds);
+                let offset = calculate_sprite_offset(
+                    &bounds,
+                    PLAYER_SPRITE_WIDTH,
+                    PLAYER_SPRITE_HEIGHT,
+                    false, // No flip for initial setup
+                );
+                (bounds.width, bounds.height, offset)
             })
-            .unwrap_or((PLAYER_WIDTH, PLAYER_HEIGHT, 0.0, 0.0));
+            .unwrap_or((PLAYER_WIDTH, PLAYER_HEIGHT, Vec2::ZERO));
 
         commands
             .spawn((
@@ -145,7 +207,7 @@ pub fn spawn_player(
             .with_children(|children| {
                 children.spawn((
                     Collider::rectangle(hitbox_width, hitbox_height),
-                    Transform::from_xyz(hitbox_offset_x, hitbox_offset_y, 0.0),
+                    Transform::from_xyz(hitbox_offset.x, hitbox_offset.y, 0.0),
                 ));
             })
             .insert(CollisionBundle {
@@ -181,6 +243,7 @@ pub fn spawn_player(
                 WalkAcceleration(walk_acceleration),
                 GroundDeceleration(walk_deceleration),
                 input_map,
+                BarrelPosition::default(),
             ));
     }
 }
@@ -200,8 +263,9 @@ pub fn toggle_gravity(
     }
 }
 
-pub fn apply_controls(
+fn apply_controls(
     action_state: Single<&ActionState<PlayerAction>, With<Player>>,
+    mut event_writer: EventWriter<PlayerShootEvent>,
     mut query: Query<
         (
             &mut Velocity,
@@ -282,20 +346,22 @@ pub fn apply_controls(
             }
         }
 
+        if action_state.just_pressed(&PlayerAction::Shoot) {
+            println!("Player shot!");
+            event_writer.write(PlayerShootEvent {});
+        }
+
         velocity.0 += direction;
 
         match (is_grounded.0, just_jumped, is_running) {
             (false, _, _) | (true, true, _) => {
                 next_animation.key = Some(PlayerAnimations::Jump);
-                println!("Jump animation triggered");
             }
             (true, false, true) => {
                 next_animation.key = Some(PlayerAnimations::Run);
-                println!("Run animation triggered");
             }
             (true, false, false) => {
                 next_animation.key = Some(PlayerAnimations::Idle);
-                println!("Idle animation triggered");
             }
         }
     }
@@ -311,11 +377,65 @@ fn debug_player_colors(mut query: Query<(&mut Sprite, &IsGrounded)>) {
     }
 }
 
+fn update_animated_components(
+    mut query: Query<(&Sprite, &mut BarrelPosition)>,
+    animation_library: Res<AnimationLibrary>,
+) {
+    let Some(player_anim_data) = &animation_library.player else {
+        return;
+    };
+
+    for (sprite, mut barrel_position) in query.iter_mut() {
+        if let Some(barrel_positions_for_frames) = player_anim_data.slice_map.get("gun_barrel")
+            && let Some(ref atlas) = sprite.texture_atlas
+        {
+            if let Some(frame) = barrel_positions_for_frames
+                .keys
+                .iter()
+                .find(|&frame| frame.frame == atlas.index)
+            {
+                let bounds = BoundsRect::from_aseprite_rect(&frame.bounds);
+                barrel_position.0 = calculate_sprite_offset(
+                    &bounds,
+                    PLAYER_SPRITE_WIDTH,
+                    PLAYER_SPRITE_HEIGHT,
+                    sprite.flip_x,
+                );
+            }
+        }
+    }
+}
+
+fn shoot(
+    mut query: Query<(&BarrelPosition, &Transform, &Sprite, &WalkSpeed), With<Player>>,
+    mut event_reader: EventReader<PlayerShootEvent>,
+    mut event_writer: EventWriter<ProjectileSpawnEvent>,
+    asset_server: Res<AssetServer>,
+) {
+    if let Some(_) = event_reader.read().last() {
+        if let Some((barrel_position, player_transform, sprite, walk_speed)) =
+            query.iter_mut().last()
+        {
+            println!("Player shoot event triggered!");
+            let bullet_dir = if sprite.flip_x { -1.0 } else { 1.0 };
+            let bullet_speed = (walk_speed.0 + 70.0) * bullet_dir;
+
+            let world_position = player_transform.translation.xy() + barrel_position.0;
+            event_writer.write(ProjectileSpawnEvent {
+                transform: Transform::from_translation(world_position.extend(0.0)),
+                velocity: ProjectileVelocity(Vec2::new(bullet_speed, 0.0)),
+                sprite: asset_server.load("sprites/bullet.png"),
+            });
+        }
+    }
+}
+
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<PlayerSpawnEvent>()
+            .add_event::<PlayerShootEvent>()
             .add_systems(
                 Update,
                 (
@@ -323,6 +443,8 @@ impl Plugin for PlayerPlugin {
                     apply_controls,
                     toggle_gravity,
                     //debug_player_colors,
+                    update_animated_components,
+                    shoot,
                 ),
             )
             .add_plugins(AnimationPlugin::<PlayerAnimations>::default());

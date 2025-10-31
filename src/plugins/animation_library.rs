@@ -22,6 +22,7 @@ pub struct AnimationData {
     pub frame_size: UVec2,
     /// Slices from Aseprite (e.g., hitboxes)
     pub slices: Vec<Slice>,
+    pub slice_map: HashMap<String, Slice>,
 }
 
 /// Metadata for a named animation (from Aseprite frame tags)
@@ -210,12 +211,24 @@ pub fn aseprite_to_animation_data(aseprite: &Aseprite) -> AnimationData {
         .map(|f| UVec2::new(f.frame.w as u32, f.frame.h as u32))
         .unwrap_or(UVec2::ZERO);
 
+    let slice_map = HashMap::from_iter(aseprite.meta.slices.iter().map(|slice| {
+        (
+            slice.name.clone(),
+            Slice {
+                name: slice.name.clone(),
+                color: slice.color.clone(),
+                keys: slice.keys.clone(),
+            },
+        )
+    }));
+
     AnimationData {
         frames,
         animations,
         sheet_size: UVec2::new(aseprite.meta.size.w as u32, aseprite.meta.size.h as u32),
         frame_size,
         slices: aseprite.meta.slices.clone(),
+        slice_map,
     }
 }
 

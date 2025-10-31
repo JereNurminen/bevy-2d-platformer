@@ -7,6 +7,7 @@ pub mod game;
 pub mod gravity;
 pub mod level;
 pub mod player;
+pub mod projectile;
 
 pub use animation_library::AnimationLibraryPlugin;
 pub use camera::CameraPlugin;
